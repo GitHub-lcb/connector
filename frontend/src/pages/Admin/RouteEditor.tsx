@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { createRoute, getRoute, updateRoute, type Route, type MappingRule, type TransformationStep, type SecurityConfig, type FieldType } from "@/lib/api";
+import { createRoute, getRoute, updateRoute, type Route, type MappingRule, type TransformationStep, type SecurityConfig, type FieldType, type AggregationConfig } from "@/lib/api";
 import { ArrowLeft, Plus, Trash2, Save, Settings, X, Lock, Upload, FileJson, List, Download, Trash } from "lucide-react";
 
 export default function RouteEditor() {
@@ -31,7 +31,16 @@ export default function RouteEditor() {
         secretKey: '',
         encryptedField: ''
       } as SecurityConfig,
-      headers: [] as { key: string, value: string, description?: string }[]
+      headers: [] as { key: string, value: string, description?: string }[],
+      aggregation: {
+        enabled: false,
+        arrayField: '',
+        groupByFields: [],
+        keepFields: [],
+        sumFields: [],
+        avgFields: [],
+        countField: ''
+      } as AggregationConfig
     }
   });
 
@@ -47,7 +56,16 @@ export default function RouteEditor() {
           mappingConfig: {
             mappings: data.mappingConfig?.mappings || [],
             security: data.mappingConfig?.security || { type: 'NONE', publicKey: '', secretKey: '', encryptedField: '' },
-            headers: data.mappingConfig?.headers || []
+            headers: data.mappingConfig?.headers || [],
+            aggregation: data.mappingConfig?.aggregation || {
+              enabled: false,
+              arrayField: '',
+              groupByFields: [],
+              keepFields: [],
+              sumFields: [],
+              avgFields: [],
+              countField: ''
+            }
           }
         });
       }).catch(err => {
@@ -646,6 +664,222 @@ export default function RouteEditor() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Array Aggregation Config */}
+        <div className="bg-white p-6 rounded-lg shadow space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-medium text-gray-900">明细聚合配置</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.mappingConfig.aggregation?.enabled || false}
+                  onChange={e => setFormData({
+                    ...formData,
+                    mappingConfig: {
+                      ...formData.mappingConfig,
+                      aggregation: {
+                        ...formData.mappingConfig.aggregation!,
+                        enabled: e.target.checked
+                      }
+                    }
+                  })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-600">启用聚合</span>
+              </label>
+            </div>
+          </div>
+
+          {formData.mappingConfig.aggregation?.enabled && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                <p className="text-xs text-blue-800">
+                  💡 <strong>功能说明：</strong>当数组中有多条明细记录时，可以按照指定字段进行分组聚合。例如：订单明细中相同SKU的数量可以求和。
+                </p>
+              </div>
+
+              {/* Array Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  数组字段路径 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.mappingConfig.aggregation?.arrayField || ''}
+                  onChange={e => setFormData({
+                    ...formData,
+                    mappingConfig: {
+                      ...formData.mappingConfig,
+                      aggregation: {
+                        ...formData.mappingConfig.aggregation!,
+                        arrayField: e.target.value
+                      }
+                    }
+                  })}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 font-mono"
+                  placeholder="例如: detail 或 items"
+                />
+                <p className="text-xs text-gray-500 mt-1">指定需要聚合的数组字段名称</p>
+              </div>
+
+              {/* Group By Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  分组字段 (按哪些字段聚合) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.mappingConfig.aggregation?.groupByFields?.join(', ') || ''}
+                  onChange={e => setFormData({
+                    ...formData,
+                    mappingConfig: {
+                      ...formData.mappingConfig,
+                      aggregation: {
+                        ...formData.mappingConfig.aggregation!,
+                        groupByFields: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                      }
+                    }
+                  })}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 font-mono"
+                  placeholder="例如: skuCode, warehouseId"
+                />
+                <p className="text-xs text-gray-500 mt-1">按这些字段进行分组，多个字段用逗号分隔</p>
+              </div>
+
+              {/* Keep Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  保持不变的字段
+                </label>
+                <input
+                  type="text"
+                  value={formData.mappingConfig.aggregation?.keepFields?.join(', ') || ''}
+                  onChange={e => setFormData({
+                    ...formData,
+                    mappingConfig: {
+                      ...formData.mappingConfig,
+                      aggregation: {
+                        ...formData.mappingConfig.aggregation!,
+                        keepFields: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                      }
+                    }
+                  })}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 font-mono"
+                  placeholder="例如: productName, unit"
+                />
+                <p className="text-xs text-gray-500 mt-1">聚合时保持不变的字段（取第一条记录的值），多个字段用逗号分隔</p>
+              </div>
+
+              {/* Sum Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  求和字段 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.mappingConfig.aggregation?.sumFields?.join(', ') || ''}
+                  onChange={e => setFormData({
+                    ...formData,
+                    mappingConfig: {
+                      ...formData.mappingConfig,
+                      aggregation: {
+                        ...formData.mappingConfig.aggregation!,
+                        sumFields: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                      }
+                    }
+                  })}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 font-mono"
+                  placeholder="例如: quantity, amount"
+                />
+                <p className="text-xs text-gray-500 mt-1">需要求和的数值字段，多个字段用逗号分隔</p>
+              </div>
+
+              {/* Average Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  求平均值字段 (可选)
+                </label>
+                <input
+                  type="text"
+                  value={formData.mappingConfig.aggregation?.avgFields?.join(', ') || ''}
+                  onChange={e => setFormData({
+                    ...formData,
+                    mappingConfig: {
+                      ...formData.mappingConfig,
+                      aggregation: {
+                        ...formData.mappingConfig.aggregation!,
+                        avgFields: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                      }
+                    }
+                  })}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 font-mono"
+                  placeholder="例如: price, weight"
+                />
+                <p className="text-xs text-gray-500 mt-1">需要求平均值的数值字段，多个字段用逗号分隔</p>
+              </div>
+
+              {/* Count Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  计数字段名 (可选)
+                </label>
+                <input
+                  type="text"
+                  value={formData.mappingConfig.aggregation?.countField || ''}
+                  onChange={e => setFormData({
+                    ...formData,
+                    mappingConfig: {
+                      ...formData.mappingConfig,
+                      aggregation: {
+                        ...formData.mappingConfig.aggregation!,
+                        countField: e.target.value
+                      }
+                    }
+                  })}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 font-mono"
+                  placeholder="例如: recordCount"
+                />
+                <p className="text-xs text-gray-500 mt-1">如果需要记录聚合的条数，指定字段名（如果不填则不添加此字段）</p>
+              </div>
+
+              {/* Example */}
+              <div className="bg-gray-50 p-4 rounded border border-gray-300">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">📝 配置示例：</h4>
+                <div className="text-xs text-gray-600 space-y-2 font-mono">
+                  <div>
+                    <span className="font-semibold">数组字段：</span> detail
+                  </div>
+                  <div>
+                    <span className="font-semibold">分组字段：</span> skuCode, warehouseId
+                  </div>
+                  <div>
+                    <span className="font-semibold">保持不变：</span> productName, unit
+                  </div>
+                  <div>
+                    <span className="font-semibold">求和字段：</span> quantity, amount
+                  </div>
+                  <div>
+                    <span className="font-semibold">计数字段：</span> count
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-300">
+                    <div className="font-semibold mb-1">效果：</div>
+                    <div className="text-gray-500">
+                      相同 skuCode + warehouseId 的记录会被合并成一条，<br/>
+                      productName 和 unit 保持第一条的值，<br/>
+                      quantity 和 amount 会累加求和，<br/>
+                      count 字段记录合并的条数。
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!formData.mappingConfig.aggregation?.enabled && (
+            <p className="text-sm text-gray-500 italic">未启用明细聚合，数组将保持原样。</p>
+          )}
         </div>
 
         {/* Mappings */}

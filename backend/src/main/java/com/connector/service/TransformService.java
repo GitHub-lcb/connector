@@ -24,15 +24,23 @@ public class TransformService {
 
         Object result = data;
 
-        // 1. Process Mappings if exists
-        if (config.containsKey("mappings")) {
-            List<Map<String, Object>> mappings = (List<Map<String, Object>>) config.get("mappings");
-            if (mappings != null && !mappings.isEmpty()) {
-                result = processMappings(data, mappings);
+        // 1. Process Aggregation if exists (before mappings)
+        if (config.containsKey("aggregation")) {
+            Map<String, Object> aggregation = (Map<String, Object>) config.get("aggregation");
+            if (aggregation != null && Boolean.TRUE.equals(aggregation.get("enabled"))) {
+                result = processAggregation(result, aggregation);
             }
         }
 
-        // 2. Process Security if exists
+        // 2. Process Mappings if exists
+        if (config.containsKey("mappings")) {
+            List<Map<String, Object>> mappings = (List<Map<String, Object>>) config.get("mappings");
+            if (mappings != null && !mappings.isEmpty()) {
+                result = processMappings(result, mappings);
+            }
+        }
+
+        // 3. Process Security if exists
         if (config.containsKey("security")) {
             Map<String, Object> security = (Map<String, Object>) config.get("security");
             result = processSecurity(result, security);
@@ -62,6 +70,132 @@ public class TransformService {
             }
         }
         return headers;
+    }
+
+    /**
+     * Process array aggregation
+     * Aggregate array elements by grouping fields and sum/avg numeric fields
+     */
+    @SuppressWarnings("unchecked")
+    private Object processAggregation(Object data, Map<String, Object> aggregationConfig) {
+        String arrayField = (String) aggregationConfig.get("arrayField");
+        List<String> groupByFields = (List<String>) aggregationConfig.get("groupByFields");
+        List<String> keepFields = (List<String>) aggregationConfig.get("keepFields");
+        List<String> sumFields = (List<String>) aggregationConfig.get("sumFields");
+        List<String> avgFields = (List<String>) aggregationConfig.get("avgFields");
+        String countField = (String) aggregationConfig.get("countField");
+
+        if (arrayField == null || arrayField.isEmpty() || groupByFields == null || groupByFields.isEmpty()) {
+            return data;
+        }
+
+        JsonNode rootNode = objectMapper.valueToTree(data);
+        if (!rootNode.isObject()) {
+            return data;
+        }
+
+        ObjectNode resultNode = rootNode.deepCopy();
+        JsonNode arrayNode = getValue(resultNode, arrayField);
+        
+        if (arrayNode == null || !arrayNode.isArray()) {
+            return data;
+        }
+
+        // Group array elements
+        Map<String, List<JsonNode>> groups = new LinkedHashMap<>();
+        
+        for (JsonNode element : arrayNode) {
+            if (!element.isObject()) continue;
+            
+            // Build group key from groupByFields
+            StringBuilder keyBuilder = new StringBuilder();
+            for (String field : groupByFields) {
+                JsonNode fieldNode = getValue(element, field);
+                String fieldValue = fieldNode != null ? fieldNode.asText() : "null";
+                keyBuilder.append(fieldValue).append("|");
+            }
+            String groupKey = keyBuilder.toString();
+            
+            groups.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(element);
+        }
+
+        // Aggregate each group
+        com.fasterxml.jackson.databind.node.ArrayNode aggregatedArray = objectMapper.createArrayNode();
+        
+        for (List<JsonNode> group : groups.values()) {
+            if (group.isEmpty()) continue;
+            
+            ObjectNode aggregatedItem = objectMapper.createObjectNode();
+            JsonNode firstItem = group.get(0);
+            
+            // 1. Set groupBy fields (from first item)
+            for (String field : groupByFields) {
+                JsonNode fieldNode = getValue(firstItem, field);
+                if (fieldNode != null) {
+                    setValueInNode(aggregatedItem, field, nodeToObject(fieldNode));
+                }
+            }
+            
+            // 2. Set keep fields (from first item)
+            if (keepFields != null) {
+                for (String field : keepFields) {
+                    JsonNode fieldNode = getValue(firstItem, field);
+                    if (fieldNode != null) {
+                        setValueInNode(aggregatedItem, field, nodeToObject(fieldNode));
+                    }
+                }
+            }
+            
+            // 3. Sum fields
+            if (sumFields != null) {
+                for (String field : sumFields) {
+                    double sum = 0.0;
+                    for (JsonNode item : group) {
+                        JsonNode fieldNode = getValue(item, field);
+                        if (fieldNode != null && fieldNode.isNumber()) {
+                            sum += fieldNode.asDouble();
+                        }
+                    }
+                    // Check if sum is integer
+                    if (sum == Math.floor(sum)) {
+                        setValueInNode(aggregatedItem, field, (long) sum);
+                    } else {
+                        setValueInNode(aggregatedItem, field, sum);
+                    }
+                }
+            }
+            
+            // 4. Average fields
+            if (avgFields != null) {
+                for (String field : avgFields) {
+                    double sum = 0.0;
+                    int count = 0;
+                    for (JsonNode item : group) {
+                        JsonNode fieldNode = getValue(item, field);
+                        if (fieldNode != null && fieldNode.isNumber()) {
+                            sum += fieldNode.asDouble();
+                            count++;
+                        }
+                    }
+                    if (count > 0) {
+                        double avg = sum / count;
+                        setValueInNode(aggregatedItem, field, avg);
+                    }
+                }
+            }
+            
+            // 5. Count field
+            if (countField != null && !countField.isEmpty()) {
+                setValueInNode(aggregatedItem, countField, group.size());
+            }
+            
+            aggregatedArray.add(aggregatedItem);
+        }
+
+        // Replace original array with aggregated array
+        setValue(resultNode, arrayField, objectMapper.convertValue(aggregatedArray, Object.class));
+
+        return objectMapper.convertValue(resultNode, Object.class);
     }
 
     @SuppressWarnings("unchecked")

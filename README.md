@@ -32,27 +32,27 @@
 
 1.  登录 MySQL 数据库。
 2.  创建数据库 `connector`。
-3.  执行初始化脚本 `backend-java/schema.sql` 建表。
+3.  执行初始化脚本 `backend/doc/schema.sql` 建表。
 
 ```sql
 CREATE DATABASE IF NOT EXISTS connector;
 USE connector;
--- 复制并执行 backend-java/schema.sql 中的内容
+-- 复制并执行 backend/doc/schema.sql 中的内容
 ```
 
-4.  修改后端配置文件 `backend-java/src/main/resources/application.yml` (如有必要)，配置您的数据库用户名和密码。
+4.  修改后端配置文件 `backend/src/main/resources/application.properties` (如有必要),配置您的数据库用户名和密码。
 
 ### 2. 启动后端 (Java)
 
-进入后端目录并运行 Spring Boot 应用：
+进入后端目录并运行 Spring Boot 应用:
 
 ```bash
-cd backend-java
+cd backend
 
-# 方式一：使用 Maven 运行
+# 方式一:使用 Maven 运行
 mvn spring-boot:run
 
-# 方式二：打包后运行
+# 方式二:打包后运行
 mvn clean package -DskipTests
 java -jar target/backend-0.0.1-SNAPSHOT.jar
 ```
@@ -65,9 +65,11 @@ java -jar target/backend-0.0.1-SNAPSHOT.jar
 
 ### 3. 启动前端 (React)
 
-进入项目根目录：
+进入前端目录:
 
 ```bash
+cd frontend
+
 # 安装依赖
 npm install
 
@@ -77,7 +79,7 @@ npm run client:dev
 
 前端服务默认启动在 **5173** 端口。打开浏览器访问 `http://localhost:5173`。
 
-> **注意**: 前端配置了代理 (`vite.config.ts`)，会将 `/api` 开头的请求转发到 `http://localhost:8081`。请确保后端服务已启动。
+> **注意**: 前端配置了代理 (`frontend/vite.config.ts`),会将 `/api` 开头的请求转发到 `http://localhost:8081`。请确保后端服务已启动。
 
 ## 开发指南
 
@@ -85,15 +87,31 @@ npm run client:dev
 
 ```
 connector/
-├── backend-java/           # Java 后端项目源码
-│   ├── src/main/java       # Java 代码
-│   └── src/main/resources  # 配置文件和 Mapper XML
-├── src/                    # React 前端项目源码
-│   ├── pages/              # 页面组件
-│   ├── lib/                # API 封装和工具函数
-│   └── ...
-├── vite.config.ts          # Vite 配置 (包含代理设置)
-└── README.md               # 项目文档
+├── backend/                      # Java 后端项目源码
+│   ├── doc/                      # 数据库脚本
+│   │   └── schema.sql            # 数据库初始化脚本
+│   ├── src/main/
+│   │   ├── java/com/connector/   # Java 代码
+│   │   │   ├── config/           # 配置类
+│   │   │   ├── controller/       # 控制器
+│   │   │   ├── entity/           # 实体类
+│   │   │   ├── mapper/           # MyBatis Mapper
+│   │   │   ├── service/          # 服务层
+│   │   │   ├── util/             # 工具类
+│   │   │   └── ConnectorApplication.java  # 启动类
+│   │   └── resources/            # 配置文件
+│   │       └── application.properties
+│   └── pom.xml                   # Maven 配置文件
+├── frontend/                     # React 前端项目源码
+│   ├── src/
+│   │   ├── pages/                # 页面组件
+│   │   ├── components/           # 通用组件
+│   │   ├── lib/                  # API 封装和工具函数
+│   │   ├── hooks/                # React Hooks
+│   │   └── ...
+│   ├── vite.config.ts            # Vite 配置 (包含代理设置)
+│   └── package.json              # 前端依赖配置
+└── README.md                     # 项目文档
 ```
 
 ### 测试流程
@@ -107,5 +125,5 @@ connector/
 
 ## 常见问题
 
-*   **端口冲突**: 如果 8081 端口被占用，请修改 `backend-java/src/main/resources/application.yml` 中的 `server.port`，并同步修改 `vite.config.ts` 中的 `target`。
-*   **数据库连接失败**: 请检查 `application.yml` 中的数据库 URL、用户名和密码是否正确。
+*   **端口冲突**: 如果 8081 端口被占用,请修改 `backend/src/main/resources/application.properties` 中的 `server.port`,并同步修改 `frontend/vite.config.ts` 中的 `target`。
+*   **数据库连接失败**: 请检查 `application.properties` 中的数据库 URL、用户名和密码是否正确。

@@ -36,6 +36,16 @@ export interface ConditionRule {
 
 export type FieldType = 'string' | 'integer' | 'decimal' | 'boolean' | 'datetime' | 'date' | 'time' | 'array' | 'object' | 'any'
 
+export interface AggregationConfig {
+  enabled: boolean
+  arrayField: string  // 需要聚合的数组字段，如 "detail"
+  groupByFields: string[]  // 聚合的分组字段，如 ["skuCode", "warehouseId"]
+  keepFields: string[]  // 保持不变的字段
+  sumFields: string[]  // 需要求和的字段
+  avgFields?: string[]  // 需要求平均的字段
+  countField?: string  // 计数字段名，如 "count"
+}
+
 export interface MappingRule {
   source: string
   target: string
