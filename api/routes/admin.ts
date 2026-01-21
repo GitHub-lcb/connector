@@ -5,51 +5,6 @@ import { transformRequest } from '../services/transformService.js'
 
 const router = Router()
 
-// Test Invoke Helper
-// Avoids CORS and Proxy issues in development by invoking logic server-side
-router.post('/test-invoke', async (req, res) => {
-  const { route_id, body } = req.body
-  
-  // 1. Get Route Config
-  const { data: route, error } = await supabase
-    .from('routes')
-    .select('*')
-    .eq('id', route_id)
-    .single()
-    
-  if (error || !route) {
-    return res.status(404).json({ error: 'Route not found' })
-  }
-
-  try {
-    // 2. Transform Body
-    const transformedBody = transformRequest(body, route.mapping_config)
-
-    // 3. Send Request
-    const response = await axios({
-      method: route.method,
-      url: route.target_url,
-      data: transformedBody,
-      timeout: 5000,
-      validateStatus: () => true // Always resolve
-    })
-
-    // 4. Return result
-    res.json({
-      status: response.status,
-      statusText: response.statusText,
-      data: response.data,
-      transformedBody // Return this for debugging visibility if needed
-    })
-
-  } catch (error: any) {
-    res.status(500).json({
-      error: error.message,
-      details: error.response?.data
-    })
-  }
-})
-
 // List routes
 router.get('/routes', async (req, res) => {
   const { data, error } = await supabase

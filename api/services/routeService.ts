@@ -17,40 +17,37 @@ let routesCache: Route[] = []
 let lastFetch = 0
 const CACHE_TTL = 60 * 1000 // 60 seconds
 
-export const getRoutes = async (): Promise<Route[]> => {
+export const getRoutes = async (includeInactive = false): Promise<Route[]> => {
   const now = Date.now()
-  if (routesCache.length > 0 && now - lastFetch < CACHE_TTL) {
+  // Only use cache for active-only requests
+  if (!includeInactive && routesCache.length > 0 && now - lastFetch < CACHE_TTL) {
     return routesCache
   }
 
-  const { data, error } = await supabase
-    .from('routes')
-    .select('*')
-    .eq('status', 'active')
+  let query = supabase.from('routes').select('*')
+  
+  if (!includeInactive) {
+    query = query.eq('status', 'active')
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error fetching routes:', error)
-    // Return cached routes if available even if expired, to avoid downtime
-    return routesCache
+    return includeInactive ? [] : routesCache
   }
 
-  if (data) {
-    routesCache = data as Route[]
+  const routes = (data || []) as Route[]
+  
+  if (!includeInactive) {
+    routesCache = routes
     lastFetch = now
   }
 
-  return routesCache
+  return routes
 }
 
-export const getRouteByPath = async (path: string, method: string): Promise<Route | undefined> => {
-  const routes = await getRoutes()
-  // Simple exact match for now. 
-  // For production, we might want regex or parameter matching (e.g. /users/:id)
-  // Requirement says: "Interface Route Forwarding".
-  // Let's assume exact match or prefix match?
-  // "Receive warehouse system HTTP request... forward... from connector URL to cloud warehouse standard interface path"
-  // Example: Connector /a/b -> Cloud /a/b
-  // This implies the source_path might be the trigger.
-  
+export const getRouteByPath = async (path: string, method: string, includeInactive = false): Promise<Route | undefined> => {
+  const routes = await getRoutes(includeInactive)
   return routes.find(r => r.source_path === path && r.method.toUpperCase() === method.toUpperCase())
 }

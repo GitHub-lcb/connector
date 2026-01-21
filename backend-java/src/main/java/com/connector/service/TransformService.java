@@ -84,6 +84,12 @@ public class TransformService {
             List<Map<String, Object>> transformations = (List<Map<String, Object>>) rule.get("transformations");
             Map<String, Object> condition = (Map<String, Object>) rule.get("condition");
 
+            // Check if this is an array mapping
+            if (sourcePath.contains("[]")) {
+                processArrayMapping(rootNode, resultNode, sourcePath, targetPath, defaultValue, transformations, condition);
+                continue;
+            }
+
             // 1. Get Value
             JsonNode valueNode = getValue(rootNode, sourcePath);
             Object value = nodeToObject(valueNode);
@@ -117,6 +123,115 @@ public class TransformService {
         }
 
         return objectMapper.convertValue(resultNode, Object.class);
+    }
+
+    /**
+     * Process array field mappings like detail[].quantity -> detail[].qty
+     */
+    @SuppressWarnings("unchecked")
+    private void processArrayMapping(JsonNode rootNode, ObjectNode resultNode, 
+                                      String sourcePath, String targetPath,
+                                      Object defaultValue,
+                                      List<Map<String, Object>> transformations,
+                                      Map<String, Object> condition) {
+        // Parse array path: detail[].quantity
+        String[] sourceParts = sourcePath.split("\\[\\]");
+        String[] targetParts = targetPath.split("\\[\\]");
+        
+        if (sourceParts.length != 2 || targetParts.length != 2) {
+            // Invalid array path format
+            return;
+        }
+        
+        String sourceArrayPath = sourceParts[0]; // "detail"
+        String sourceFieldPath = sourceParts[1].startsWith(".") ? sourceParts[1].substring(1) : sourceParts[1]; // "quantity"
+        
+        String targetArrayPath = targetParts[0];
+        String targetFieldPath = targetParts[1].startsWith(".") ? targetParts[1].substring(1) : targetParts[1];
+        
+        // Get source array
+        JsonNode sourceArrayNode = getValue(rootNode, sourceArrayPath);
+        if (sourceArrayNode == null || !sourceArrayNode.isArray()) {
+            return;
+        }
+        
+        // Ensure target array exists in result
+        JsonNode targetArrayNode = getValue(resultNode, targetArrayPath);
+        if (targetArrayNode == null || !targetArrayNode.isArray()) {
+            // Create empty array node first
+            com.fasterxml.jackson.databind.node.ArrayNode newArrayNode = objectMapper.createArrayNode();
+            setValue(resultNode, targetArrayPath, objectMapper.convertValue(newArrayNode, Object.class));
+        }
+        
+        // Process each array element
+        for (int i = 0; i < sourceArrayNode.size(); i++) {
+            JsonNode sourceElement = sourceArrayNode.get(i);
+            if (!sourceElement.isObject()) continue;
+            
+            // Get field value from source element
+            JsonNode fieldNode = sourceFieldPath.isEmpty() ? sourceElement : getValue(sourceElement, sourceFieldPath);
+            Object value = nodeToObject(fieldNode);
+            
+            // Condition check
+            if (condition != null && !checkCondition(value, condition)) {
+                continue;
+            }
+            
+            // Default value
+            if (value == null && defaultValue != null) {
+                value = defaultValue;
+            }
+            
+            // Transformations
+            if (value != null && transformations != null) {
+                for (Map<String, Object> step : transformations) {
+                    value = applyTransformation(value, step);
+                }
+            }
+            
+            if (value != null) {
+                // Get target array
+                JsonNode targetArrayNodeFinal = getValue(resultNode, targetArrayPath);
+                if (targetArrayNodeFinal != null && targetArrayNodeFinal.isArray()) {
+                    com.fasterxml.jackson.databind.node.ArrayNode targetArray = (com.fasterxml.jackson.databind.node.ArrayNode) targetArrayNodeFinal;
+                    
+                    // Ensure target array has element at index i
+                    while (targetArray.size() <= i) {
+                        targetArray.add(objectMapper.createObjectNode());
+                    }
+                    
+                    // Get or create target element
+                    JsonNode targetElement = targetArray.get(i);
+                    if (targetElement != null && targetElement.isObject()) {
+                        ObjectNode targetObj = (ObjectNode) targetElement;
+                        if (targetFieldPath.isEmpty()) {
+                            // Can't set root of array element, skip
+                        } else {
+                            setValueInNode(targetObj, targetFieldPath, value);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private void setValueInNode(ObjectNode node, String path, Object value) {
+        if (path.isEmpty()) return;
+        
+        String[] parts = path.split("\\.");
+        ObjectNode current = node;
+        
+        for (int i = 0; i < parts.length - 1; i++) {
+            String part = parts[i];
+            JsonNode childNode = current.get(part);
+            if (childNode == null || !childNode.isObject()) {
+                childNode = objectMapper.createObjectNode();
+                current.set(part, childNode);
+            }
+            current = (ObjectNode) childNode;
+        }
+        
+        current.set(parts[parts.length - 1], objectMapper.valueToTree(value));
     }
 
     private Object processSecurity(Object data, Map<String, Object> security) {
@@ -168,6 +283,13 @@ public class TransformService {
     }
 
     private JsonNode getValue(JsonNode root, String path) {
+        // Handle array notation: detail[].quantity
+        if (path.contains("[]")) {
+            // Not supported for now - arrays require special handling
+            // For array element access, we'd need to process all array elements
+            return null;
+        }
+        
         String[] parts = path.split("\\.");
         JsonNode current = root;
         for (String part : parts) {

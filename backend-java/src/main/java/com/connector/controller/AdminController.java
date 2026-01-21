@@ -113,62 +113,6 @@ public class AdminController {
         return stats;
     }
 
-    // Test Invoke
-    @PostMapping("/test-invoke")
-    public ResponseEntity<Map<String, Object>> testInvoke(@RequestBody Map<String, Object> payload) {
-        String routeId = (String) payload.get("routeId");
-        Object body = payload.get("body");
-
-        Route route = routeMapper.selectById(routeId);
-        if (route == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        long startTime = System.currentTimeMillis();
-        Map<String, Object> result = new HashMap<>();
-        try {
-            // 1. Transform
-            Object transformedBody = transformService.transform(body, route.getMappingConfig());
-            result.put("transformedBody", transformedBody);
-
-            // 2. Invoke
-            try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-                HttpUriRequestBase request = new HttpUriRequestBase(route.getMethod(), URI.create(route.getTargetUrl()));
-                
-                if (transformedBody != null) {
-                    String jsonBody = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(transformedBody);
-                    request.setEntity(new StringEntity(jsonBody, ContentType.APPLICATION_JSON));
-                }
-
-                try (CloseableHttpResponse response = httpClient.execute(request)) {
-                    int statusCode = response.getCode();
-                    result.put("status", statusCode);
-                    result.put("statusText", response.getReasonPhrase());
-                    
-                    String respBody = EntityUtils.toString(response.getEntity());
-                    
-                    // Log the test request
-                    logRequest(routeId, route.getSourcePath() + " (TEST)", statusCode, System.currentTimeMillis() - startTime, null);
-                    
-                    try {
-                        result.put("data", new com.fasterxml.jackson.databind.ObjectMapper().readValue(respBody, Object.class));
-                    } catch (Exception e) {
-                        result.put("data", respBody);
-                    }
-                }
-            }
-            
-            return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            // Log error
-            logRequest(routeId, route.getSourcePath() + " (TEST)", 500, System.currentTimeMillis() - startTime, e.getMessage());
-            
-            result.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(result);
-        }
-    }
-
     private void logRequest(String routeId, String path, int statusCode, long latency, String error) {
         RouteLog log = new RouteLog();
         log.setRouteId(routeId);

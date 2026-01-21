@@ -9,10 +9,13 @@ export const proxyHandler = async (req: Request, res: Response) => {
   const { path, method, body, query, headers } = req
 
   // 1. Find Route
-  // We need to strip /api/proxy or similar if we mount it there.
-  // Assuming this handler is mounted at root or we check full path.
-  // Let's use req.path directly.
-  const route = await getRouteByPath(path, method)
+  const isTest = headers['x-connector-test'] === 'true'
+  let route = await getRouteByPath(path, method, isTest)
+
+  // If not found and starts with /api, try matching without /api prefix
+  if (!route && path.startsWith('/api')) {
+    route = await getRouteByPath(path.substring(4), method, isTest)
+  }
 
   if (!route) {
     res.status(404).json({ error: 'Route not found' })
@@ -36,6 +39,15 @@ export const proxyHandler = async (req: Request, res: Response) => {
         ...(headers.authorization ? { Authorization: headers.authorization } : {}),
       },
       timeout: 5000, // 5s timeout
+    }
+
+    // Add Custom Headers from route config
+    if (route.mapping_config?.headers && Array.isArray(route.mapping_config.headers)) {
+      route.mapping_config.headers.forEach((header: any) => {
+        if (header.key && header.value) {
+          config.headers![header.key] = header.value
+        }
+      })
     }
 
     // 4. Send Request

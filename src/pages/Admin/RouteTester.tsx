@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getRoutes, testInvokeRoute, type Route } from "@/lib/api";
+import { getRoutes, type Route, type FieldType, api } from "@/lib/api";
 import { Play, CheckCircle, XCircle, ArrowRight } from "lucide-react";
 import axios from "axios";
 
@@ -17,22 +17,211 @@ export default function RouteTester() {
 
   const selectedRoute = routes.find(r => r.id === selectedRouteId);
 
+  // Generate mock value based on field name and type
+  const generateMockValue = (fieldPath: string, fieldType?: FieldType): any => {
+    const parts = fieldPath.split('.');
+    const leafKey = parts[parts.length - 1].replace('[]', '');
+
+    switch (fieldType) {
+      case 'string':
+        return leafKey;
+      case 'integer':
+        return 12345;
+      case 'decimal':
+        return 123.45;
+      case 'boolean':
+        return true;
+      case 'datetime':
+        return new Date().toISOString();
+      case 'date':
+        return new Date().toISOString().split('T')[0];
+      case 'time':
+        return new Date().toTimeString().split(' ')[0];
+      case 'array':
+        return [];
+      case 'object':
+        return {};
+      default:
+        return leafKey;
+    }
+  };
+
   useEffect(() => {
     if (selectedRoute) {
-      // Pre-fill a sample body based on mappings if possible, or just default
       const sample: Record<string, any> = {};
+      const allFields: Array<{path: string[], isArray: boolean, mockValue: any, fieldType?: FieldType}> = [];
+      
+      // Collect all field information
       selectedRoute.mappingConfig?.mappings?.forEach(m => {
-        // Construct a simple nested object for display
-        const parts = m.source.split('.');
+        const source = m.source;
+        // Use defaultValue if set, otherwise generate based on key/type
+        const mockValue = (m.defaultValue !== undefined && m.defaultValue !== "") 
+          ? m.defaultValue 
+          : generateMockValue(source, m.sourceType);
+        
+        if (source.includes('[]')) {
+          // Array field: detail[].quantity
+          const arrayPath = source.split('[]')[0];
+          const subPath = source.split('[]')[1]?.substring(1);
+          
+          if (subPath) {
+            const fullPath = arrayPath.split('.').concat(subPath.split('.'));
+            allFields.push({path: fullPath, isArray: true, mockValue, fieldType: m.sourceType});
+          }
+        } else {
+          // Regular field (or array field without [])
+          const fullPath = source.split('.');
+          // Check if this field is explicitly marked as array type
+          const isArrayType = m.sourceType === 'array';
+          allFields.push({path: fullPath, isArray: isArrayType, mockValue, fieldType: m.sourceType});
+        }
+      });
+      
+      // Determine which paths are parent paths (should be objects/arrays, not values)
+      const parentPaths = new Set<string>();
+      allFields.forEach(field => {
+        for (let i = 0; i < field.path.length - 1; i++) {
+          const parentPath = field.path.slice(0, i + 1).join('.');
+          parentPaths.add(parentPath);
+        }
+      });
+      
+      // Group array fields by their array path
+      const arrayGroups = new Map<string, Array<{subPath: string[], mockValue: any}>>();
+      allFields.forEach(field => {
+        if (field.isArray) {
+          // Find the array root by checking mappings
+          const matchingMapping = selectedRoute.mappingConfig?.mappings?.find(m => {
+            if (!m.source.includes('[]')) return false;
+            const arrayPath = m.source.split('[]')[0];
+            const subPath = m.source.split('[]')[1]?.substring(1);
+            if (!subPath) return false;
+            const fullPath = arrayPath.split('.').concat(subPath.split('.'));
+            return fullPath.join('.') === field.path.join('.');
+          });
+          
+          if (matchingMapping) {
+            const arrayPath = matchingMapping.source.split('[]')[0];
+            if (!arrayGroups.has(arrayPath)) {
+              arrayGroups.set(arrayPath, []);
+            }
+            const subPath = matchingMapping.source.split('[]')[1]?.substring(1);
+            if (subPath) {
+              arrayGroups.get(arrayPath)!.push({subPath: subPath.split('.'), mockValue: field.mockValue});
+            }
+          }
+        }
+      });
+      
+      // Build the structure
+      // First create array structures
+      arrayGroups.forEach((fields, arrayPath) => {
+        const arrayParts = arrayPath.split('.');
         let current = sample;
-        parts.forEach((part, i) => {
-          if (i === parts.length - 1) {
-            current[part] = "测试值";
-          } else {
-            current[part] = current[part] || {};
+        
+        // Navigate to parent
+        for (let i = 0; i < arrayParts.length - 1; i++) {
+          if (!current[arrayParts[i]] || typeof current[arrayParts[i]] !== 'object') {
+            current[arrayParts[i]] = {};
+          }
+          current = current[arrayParts[i]];
+        }
+        
+        // Create array with one sample item
+        const arrayField = arrayParts[arrayParts.length - 1];
+        const arrayItem: Record<string, any> = {};
+        
+        // Fill in array item fields
+        fields.forEach(({subPath, mockValue}) => {
+          let target = arrayItem;
+          for (let i = 0; i < subPath.length - 1; i++) {
+            if (!target[subPath[i]]) {
+              target[subPath[i]] = {};
+            }
+            target = target[subPath[i]];
+          }
+          target[subPath[subPath.length - 1]] = mockValue;
+        });
+        
+        current[arrayField] = [arrayItem];
+      });
+      
+      // Then create regular fields (skip those inside arrays)
+      allFields.forEach(field => {
+        if (field.isArray && !field.path.join('.').includes('[]')) {
+          // This is a standalone array field (e.g., "detail" with type=array)
+          // Not an array element field (e.g., "detail[].quantity")
+          const pathStr = field.path.join('.');
+          
+          // Check if already processed as part of array group
+          if (arrayGroups.has(pathStr)) return;
+          
+          // Create empty array or array with sample data
+          let current = sample;
+          for (let i = 0; i < field.path.length - 1; i++) {
+            const part = field.path[i];
+            if (!current[part] || typeof current[part] !== 'object') {
+              current[part] = {};
+            }
             current = current[part];
           }
+          
+          const lastPart = field.path[field.path.length - 1];
+          // Generate array with one sample item based on field type
+          if (field.fieldType === 'array') {
+            // Check if there's a default value
+            if (Array.isArray(field.mockValue)) {
+              current[lastPart] = field.mockValue;
+            } else {
+              // Create array with one item containing the key name
+              current[lastPart] = [lastPart];
+            }
+          } else {
+            current[lastPart] = field.mockValue;
+          }
+          return;
+        }
+        
+        // Skip array element fields (already handled)
+        const pathStr = field.path.join('.');
+        if (pathStr.includes('[]') || field.isArray) return;
+        
+        // Check if this field is inside an array
+        let isInsideArray = false;
+        arrayGroups.forEach((_, arrayPath) => {
+          if (pathStr.startsWith(arrayPath + '.')) {
+            isInsideArray = true;
+          }
         });
+        
+        if (isInsideArray) return; // Skip, already handled in array creation
+        
+        // Check if this path is a parent path (should not be set to a value)
+        if (parentPaths.has(pathStr)) return;
+        
+        // Set the value
+        let current = sample;
+        for (let i = 0; i < field.path.length - 1; i++) {
+          const part = field.path[i];
+          
+          // Don't overwrite arrays!
+          if (Array.isArray(current[part])) {
+            // This part is already an array, skip this field
+            return;
+          }
+          
+          if (!current[part] || typeof current[part] !== 'object') {
+            current[part] = {};
+          }
+          current = current[part];
+        }
+        
+        const lastPart = field.path[field.path.length - 1];
+        // Don't overwrite arrays!
+        if (Array.isArray(current[lastPart])) {
+          return;
+        }
+        current[lastPart] = field.mockValue;
       });
       
       if (Object.keys(sample).length > 0) {
@@ -61,9 +250,22 @@ export default function RouteTester() {
         return;
       }
 
-      // Use the test helper which calls /api/admin/test-invoke
+      // Call the proxy directly
       const startTime = Date.now();
-      const res = await testInvokeRoute(selectedRoute.id, data);
+      
+      // Use the source path directly. 
+      // api instance adds /api prefix which is needed for Vite proxy to reach backend.
+      // Backend ProxyController will handle matching.
+      const res = await api.request({
+        method: selectedRoute.method,
+        url: selectedRoute.sourcePath,
+        data: data,
+        headers: {
+          'X-Connector-Test': 'true'
+        },
+        validateStatus: () => true // Always resolve so we can see error responses
+      });
+      
       const endTime = Date.now();
 
       setResponse({

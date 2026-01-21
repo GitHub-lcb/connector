@@ -38,18 +38,21 @@ public class ProxyController {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // Skip api/admin requests (handled by AdminController)
-        if (path.startsWith("/api/admin")) {
-            return null; // Spring will try next handler or 404 if not found
+        // Skip api/admin, api/auth, api/mock requests
+        if (path.startsWith("/api/admin") || path.startsWith("/api/auth") || path.startsWith("/api/mock")) {
+            return null;
         }
 
         long startTime = System.currentTimeMillis();
         
         // 1. Find Route
-        Route route = routeMapper.selectOne(new QueryWrapper<Route>()
-                .eq("source_path", path)
-                .eq("method", method)
-                .eq("status", "active"));
+        // Try exact match first
+        Route route = findRoute(path, method, request);
+        
+        // If not found and starts with /api, try without /api
+        if (route == null && path.startsWith("/api")) {
+            route = findRoute(path.substring(4), method, request);
+        }
 
         if (route == null) {
             return ResponseEntity.notFound().build();
@@ -114,5 +117,20 @@ public class ProxyController {
         log.setLatencyMs(latency);
         log.setErrorMsg(error);
         routeLogMapper.insert(log);
+    }
+
+    private Route findRoute(String path, String method, HttpServletRequest request) {
+        QueryWrapper<Route> queryWrapper = new QueryWrapper<Route>()
+                .eq("source_path", path)
+                .eq("method", method);
+        
+        String testHeader = request.getHeader("X-Connector-Test");
+        if (testHeader != null && testHeader.equalsIgnoreCase("true")) {
+            // No status check needed for test mode
+        } else {
+            queryWrapper.eq("status", "active");
+        }
+        
+        return routeMapper.selectOne(queryWrapper);
     }
 }
