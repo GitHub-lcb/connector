@@ -1,3 +1,12 @@
+相关配置页面截图：
+<img width="1902" height="957" alt="image" src="https://github.com/user-attachments/assets/8f2708d6-d24c-4109-82ae-b6820187e76c" />
+<img width="1902" height="519" alt="image" src="https://github.com/user-attachments/assets/63cf86d9-c481-4403-8632-967c62fcd918" />
+<img width="1383" height="912" alt="image" src="https://github.com/user-attachments/assets/d426126d-ec3c-47d1-b384-6c4a86d53b7d" />
+<img width="1422" height="781" alt="image" src="https://github.com/user-attachments/assets/f72ae386-86dc-4845-b723-743b527ecf8c" />
+<img width="1376" height="534" alt="image" src="https://github.com/user-attachments/assets/1aabcfa1-f7fc-4ea2-adf3-55932e603f67" />
+<img width="1882" height="939" alt="image" src="https://github.com/user-attachments/assets/dc213398-cb63-4024-a1fa-4b53fe985c58" />
+<img width="1846" height="879" alt="image" src="https://github.com/user-attachments/assets/b4b788bc-503b-4cf9-8326-e9b9b7ad7d5d" />
+
 # Connector Project
 
 这是一个基于 React (前端) 和 Spring Boot (后端) 的全栈应用，用于路由转发和数据映射。
