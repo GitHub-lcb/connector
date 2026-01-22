@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="net.lab1024.sa.admin.module.business.connector.dao.ConnectorRouteLogDao">
+
+    <select id="queryLogPage" resultType="net.lab1024.sa.admin.module.business.connector.domain.vo.ConnectorRouteLogVO">
+        SELECT
+            l.*,
+            l.created_at AS createTime,
+            r.name AS routeName
+        FROM
+            route_logs l
+        LEFT JOIN
+            routes r ON l.route_id = r.id
+        <where>
+            <if test="queryForm.routeName != null and queryForm.routeName != ''">
+                AND r.name LIKE CONCAT('%', #{queryForm.routeName}, '%')
+            </if>
+            <if test="queryForm.channel != null and queryForm.channel != ''">
+                AND l.channel = #{queryForm.channel}
+            </if>
+            <if test="queryForm.requestUrl != null and queryForm.requestUrl != ''">
+                AND l.request_path LIKE CONCAT('%', #{queryForm.requestUrl}, '%')
+            </if>
+            <if test="queryForm.successFlag != null">
+                <choose>
+                    <when test="queryForm.successFlag">
+                        AND l.status_code >= 200 AND l.status_code &lt; 300
+                    </when>
+                    <otherwise>
+                        AND (l.status_code &lt; 200 OR l.status_code >= 300)
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+        ORDER BY l.created_at DESC
+    </select>
+
+</mapper>

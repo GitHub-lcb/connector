@@ -1,129 +1,141 @@
-相关配置页面截图：
-<img width="1902" height="957" alt="image" src="https://github.com/user-attachments/assets/8f2708d6-d24c-4109-82ae-b6820187e76c" />
-<img width="1902" height="519" alt="image" src="https://github.com/user-attachments/assets/63cf86d9-c481-4403-8632-967c62fcd918" />
-<img width="1383" height="912" alt="image" src="https://github.com/user-attachments/assets/d426126d-ec3c-47d1-b384-6c4a86d53b7d" />
-<img width="1422" height="781" alt="image" src="https://github.com/user-attachments/assets/f72ae386-86dc-4845-b723-743b527ecf8c" />
-<img width="1376" height="534" alt="image" src="https://github.com/user-attachments/assets/1aabcfa1-f7fc-4ea2-adf3-55932e603f67" />
-<img width="1882" height="939" alt="image" src="https://github.com/user-attachments/assets/dc213398-cb63-4024-a1fa-4b53fe985c58" />
-<img width="1846" height="879" alt="image" src="https://github.com/user-attachments/assets/b4b788bc-503b-4cf9-8326-e9b9b7ad7d5d" />
+# 🚀 Connector - 下一代企业级路由转发与数据映射平台
 
-# Connector Project
+> **连接万物，智通未来。**
+> 
+> Connector 是一个基于 Spring Boot 和 React/Vue 的全栈中间件解决方案，专注于简化微服务间的 API 路由、数据清洗与协议转换。
 
-这是一个基于 React (前端) 和 Spring Boot (后端) 的全栈应用，用于路由转发和数据映射。
+---
 
-## 项目架构
+## 📚 项目简介
 
-- **前端**: React + TypeScript + Vite + Tailwind CSS
-- **后端**: Java 8 + Spring Boot 2.7 + MyBatis-Plus
-- **数据库**: MySQL 5.7+
+在微服务架构和遗留系统集成的复杂场景下，Connector 充当了智能网关的角色。它不仅是一个请求转发器，更是一个强大的**数据适配器**。通过可视化配置，用户可以轻松定义请求如何从源端流向目标端，并在途中完成数据的"华丽转身"。
 
-## 前置要求
+**核心价值：**
+*   **解耦**：前端与后端、服务与服务之间的接口契约解耦。
+*   **适配**：新老系统对接时的字段映射与格式转换。
+*   **安全**：敏感数据的自动脱敏与加密传输。
+*   **监控**：全链路的请求日志追踪与回放。
 
-在开始之前，请确保您的开发环境已安装以下工具：
+---
 
-1.  **Node.js**: v16+ (推荐使用 LTS 版本)
-2.  **JDK**: JDK 1.8
-3.  **Maven**: 3.6+
-4.  **MySQL**: 5.7 或 8.0
+## 🏗️ 技术架构
 
-## 快速开始
+本项目采用前后端分离架构，确保高性能与易维护性。
 
-### 1. 数据库配置
+*   **前端 (Frontend)**:
+    *   **核心框架**: Vue 3 + Vite
+    *   **UI 组件库**: Ant Design Vue (Smart Admin 架构)
+    *   **特性**: 响应式设计，极速构建。
+*   **后端 (Backend)**:
+    *   **核心框架**: Spring Boot 2.7 + Java 8
+    *   **持久层**: MyBatis-Plus
+    *   **安全**: Spring Security + JWT
+    *   **工具**: HttpClient 5 (高性能转发), Jackson (JSON 处理)
+*   **数据存储**: MySQL 5.7+
 
-1.  登录 MySQL 数据库。
-2.  创建数据库 `connector`。
-3.  执行初始化脚本 `backend/doc/schema.sql` 建表。
+---
 
-```sql
-CREATE DATABASE IF NOT EXISTS connector;
-USE connector;
--- 复制并执行 backend/doc/schema.sql 中的内容
-```
+## 🌟 连接器模块：功能详解 (PPT 核心素材)
 
-4.  修改后端配置文件 `backend/src/main/resources/application.properties` (如有必要),配置您的数据库用户名和密码。
+> *以下内容专为演示文档设计，突出了系统的核心能力。请在 PPT 制作时参考以下结构和文案，并配合系统截图使用。*
 
-### 2. 启动后端 (Java)
+### 1. 🚦 智能路由引擎 (Intelligent Routing Engine)
 
-进入后端目录并运行 Spring Boot 应用:
+Connector 的心脏是一个高性能的动态代理引擎。它接管了 `/connector/proxy/**` 下的所有流量，并根据配置规则精确分发。
 
+*   **动态代理**: 无需重启服务，路由规则即时生效。
+*   **多模式匹配**: 支持 GET, POST, PUT, DELETE 等全系 HTTP 方法。
+*   **环境隔离**: 支持测试模式 (`X-Connector-Test`)，让您在不影响生产环境的情况下调试新路由。
+
+> **[PPT 配图建议]**: 请在此处粘贴 "路由管理列表" 页面截图，展示路由名称、源路径、目标地址和状态开关。
+
+### 2. ⚗️ 数据炼金术 (Data Transformation)
+
+这不仅仅是转发，这是数据的重塑。通过 `ConnectorTransformService`，我们提供了强大的数据处理管线：
+
+*   **字段映射 (Field Mapping)**: 将上游的 `user_name` 变为下游的 `username`，或者将扁平结构转换为嵌套对象。
+*   **数据聚合 (Aggregation)**: 
+    *   *场景*: 列表数据字段补全。
+    *   *能力*: 自动保留主记录字段（Deep Copy），并对数值型字段进行高精度（BigDecimal）汇总计算。
+*   **安全加固 (Security)**: 内置 RSA 加解密支持，确保敏感信息在传输过程中即使被截获也无法破解。
+
+> **[PPT 配图建议]**: 请在此处粘贴 "路由编辑/配置" 页面截图，重点展示 "数据映射配置" 或 JSON 配置区域。
+
+### 3. 🛡️ 全链路可观测性 (Full Observability)
+
+拒绝黑盒！Connector 记录了每一次呼吸。
+
+*   **请求日志 (Request Logging)**: 详细记录请求头、请求体、响应数据、耗时以及 HTTP 状态码。
+*   **配置时光机 (Config History)**: 谁在什么时候修改了路由规则？变更历史一目了然，支持配置回溯。
+*   **健康大盘**: 实时监控路由的调用频率与成功率（Stats API）。
+
+> **[PPT 配图建议]**: 请在此处粘贴 "请求日志详情" 页面截图，展示 Request/Response 的 JSON 对比。
+
+### 4. 🧩 开发者友好套件 (Developer Kit)
+
+为了让集成测试更简单，我们内置了 Mock 服务中心。
+
+*   **Echo 回显服务**: 发送什么返回什么，用于调试网络连通性和参数传递。
+*   **Mock 订单服务**: 模拟真实的业务接口延迟和响应结构，方便前端在后端未就绪时进行开发。
+
+> **[PPT 配图建议]**: 请在此处粘贴 "Mock 服务" 或 "路由测试台" 的截图。
+
+---
+
+## 🚀 快速开始 (Quick Start)
+
+### 1. 环境准备
+确保您的电脑已安装：
+*   JDK 1.8+
+*   Node.js 16+
+*   MySQL 5.7/8.0
+*   Maven 3.6+
+
+### 2. 数据库初始化
+1.  创建数据库 `connector`。
+2.  执行 SQL 脚本：
+    *   基础表结构: `doc/smart_admin_v3.sql`
+    *   连接器表结构: `doc/connector.sql`
+
+### 3. 启动后端
 ```bash
-cd backend
-
-# 方式一:使用 Maven 运行
+cd smart-admin-api-java8-springboot2/sa-admin
 mvn spring-boot:run
-
-# 方式二:打包后运行
-mvn clean package -DskipTests
-java -jar target/backend-0.0.1-SNAPSHOT.jar
 ```
+服务默认运行在端口 `1024` (或 `8081`，视配置而定)。
+*   Swagger 文档: `http://localhost:1024/swagger-ui/index.html`
 
-后端服务默认启动在 **8081** 端口。
-
-*   **API 文档/测试接口**: 
-    *   Mock 回显: `http://localhost:8081/api/mock/echo`
-    *   Mock 延迟: `http://localhost:8081/api/mock/delay?ms=2000`
-
-### 3. 启动前端 (React)
-
-进入前端目录:
-
+### 4. 启动前端
 ```bash
-cd frontend
-
-# 安装依赖
+cd smart-admin-web-javascript
 npm install
-
-# 启动开发服务器
-npm run client:dev
+npm run dev
 ```
+访问地址: `http://localhost:5173`
 
-前端服务默认启动在 **5173** 端口。打开浏览器访问 `http://localhost:5173`。
+---
 
-> **注意**: 前端配置了代理 (`frontend/vite.config.ts`),会将 `/api` 开头的请求转发到 `http://localhost:8081`。请确保后端服务已启动。
+## 📂 目录结构说明
 
-## 开发指南
-
-### 目录结构
-
-```
+```text
 connector/
-├── backend/                      # Java 后端项目源码
-│   ├── doc/                      # 数据库脚本
-│   │   └── schema.sql            # 数据库初始化脚本
-│   ├── src/main/
-│   │   ├── java/com/connector/   # Java 代码
-│   │   │   ├── config/           # 配置类
-│   │   │   ├── controller/       # 控制器
-│   │   │   ├── entity/           # 实体类
-│   │   │   ├── mapper/           # MyBatis Mapper
-│   │   │   ├── service/          # 服务层
-│   │   │   ├── util/             # 工具类
-│   │   │   └── ConnectorApplication.java  # 启动类
-│   │   └── resources/            # 配置文件
-│   │       └── application.properties
-│   └── pom.xml                   # Maven 配置文件
-├── frontend/                     # React 前端项目源码
-│   ├── src/
-│   │   ├── pages/                # 页面组件
-│   │   ├── components/           # 通用组件
-│   │   ├── lib/                  # API 封装和工具函数
-│   │   ├── hooks/                # React Hooks
-│   │   └── ...
-│   ├── vite.config.ts            # Vite 配置 (包含代理设置)
-│   └── package.json              # 前端依赖配置
-└── README.md                     # 项目文档
+├── smart-admin-api-java8-springboot2/  # 后端工程 (Spring Boot)
+│   ├── sa-admin/                       # 管理端 API 源码
+│   │   └── .../module/business/connector/ # ★ 连接器核心业务代码
+│   └── sa-base/                        # 基础框架代码
+├── smart-admin-web-javascript/         # 前端工程 (Vue 3)
+│   ├── src/api/business/connector/     # 连接器前端 API
+│   ├── src/router/business/            # 连接器路由配置
+│   └── ...
+└── doc/                                # 数据库脚本与文档
 ```
 
-### 测试流程
+---
 
-1.  **创建路由**: 在前端页面 "路由管理" -> "新建路由"。
-2.  **配置 Mock 目标**: 
-    *   源路径: `/test`
-    *   目标地址: `http://localhost:8081/api/mock/echo`
-3.  **在线测试**: 进入 "路由测试台"，选择刚才创建的路由，发送请求。
-4.  **查看结果**: 响应结果区域将显示后端 Mock 接口返回的数据；可以在 "请求日志" 页面查看转发记录。
+## ❓ 常见问题
 
-## 常见问题
+**Q: 代理请求报 404？**
+A: 请检查路由配置中的 `Source Path` 是否与请求路径完全匹配，并确认路由状态已设置为 `Active`（开启）。
 
-*   **端口冲突**: 如果 8081 端口被占用,请修改 `backend/src/main/resources/application.properties` 中的 `server.port`,并同步修改 `frontend/vite.config.ts` 中的 `target`。
-*   **数据库连接失败**: 请检查 `application.properties` 中的数据库 URL、用户名和密码是否正确。
+**Q: 如何配置数据库连接？**
+A: 修改 `smart-admin-api-java8-springboot2/sa-admin/src/main/resources/dev/application.yaml` 中的 datasource 配置。
