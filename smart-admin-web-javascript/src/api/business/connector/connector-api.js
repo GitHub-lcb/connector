@@ -42,5 +42,10 @@ export const connectorApi = {
   // 获取统计数据
   getStats: () => {
     return getRequest('/connector/route/stats');
+  },
+
+  // 配置回滚
+  rollback: (historyId) => {
+    return getRequest(`/connector/route/rollback/${historyId}`);
   }
 };

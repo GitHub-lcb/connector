@@ -8,7 +8,7 @@
 -- 导出 smart_admin_v3 的数据库结构
 DROP DATABASE IF EXISTS `connector`;
 CREATE DATABASE IF NOT EXISTS `connector` ;
-USE `smart_admin_v3`;
+USE `connector`;
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;

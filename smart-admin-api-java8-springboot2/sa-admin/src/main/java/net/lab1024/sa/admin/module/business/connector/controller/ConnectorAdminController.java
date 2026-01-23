@@ -74,4 +74,10 @@ public class ConnectorAdminController {
     public ResponseDTO<Map<String, Object>> getStats() {
         return connectorRouteService.getStats();
     }
+
+    @Operation(summary = "配置回滚")
+    @GetMapping("/rollback/{historyId}")
+    public ResponseDTO<String> rollback(@PathVariable String historyId) {
+        return connectorRouteService.rollback(historyId);
+    }
 }

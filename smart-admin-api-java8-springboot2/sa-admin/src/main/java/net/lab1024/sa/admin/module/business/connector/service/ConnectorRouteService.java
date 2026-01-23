@@ -16,9 +16,11 @@ import net.lab1024.sa.admin.module.business.connector.domain.vo.ConnectorConfigH
 import net.lab1024.sa.admin.module.business.connector.domain.vo.ConnectorRouteLogVO;
 import net.lab1024.sa.admin.module.business.connector.domain.vo.ConnectorRouteVO;
 import net.lab1024.sa.base.common.domain.PageResult;
+import net.lab1024.sa.base.common.domain.RequestUser;
 import net.lab1024.sa.base.common.domain.ResponseDTO;
 import net.lab1024.sa.base.common.util.SmartBeanUtil;
 import net.lab1024.sa.base.common.util.SmartPageUtil;
+import net.lab1024.sa.base.common.util.SmartRequestUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -127,26 +129,138 @@ public class ConnectorRouteService {
             return ResponseDTO.userErrorParam("Route not found");
         }
 
-        // Record history
+        // 1. Snapshot Old Config
+        Map<String, Object> oldConfigMap = createConfigSnapshot(oldEntity);
+        
+        // 2. Prepare New Entity (Merge old + update)
+        // Create a copy of old entity first to ensure we have all fields
+        ConnectorRouteEntity newEntity = SmartBeanUtil.copy(oldEntity, ConnectorRouteEntity.class);
+        
+        // Update fields from form if they are present (support partial update)
+        if (updateForm.getName() != null) newEntity.setName(updateForm.getName());
+        if (updateForm.getChannel() != null) newEntity.setChannel(updateForm.getChannel());
+        if (updateForm.getSourcePath() != null) newEntity.setSourcePath(updateForm.getSourcePath());
+        if (updateForm.getTargetUrl() != null) newEntity.setTargetUrl(updateForm.getTargetUrl());
+        if (updateForm.getMethod() != null) newEntity.setMethod(updateForm.getMethod());
+        if (updateForm.getStatus() != null) newEntity.setStatus(updateForm.getStatus());
+        if (updateForm.getMappingConfig() != null) newEntity.setMappingConfig(updateForm.getMappingConfig());
+        
+        // 3. Snapshot New Config
+        Map<String, Object> newConfigMap = createConfigSnapshot(newEntity);
+        
+        // 4. Record History
         ConnectorConfigHistoryEntity history = new ConnectorConfigHistoryEntity();
         history.setRouteId(updateForm.getId());
-        history.setOldConfig(oldEntity.getMappingConfig());
-        history.setNewConfig(updateForm.getMappingConfig());
-        history.setChangedBy("admin"); // TODO: Get current user
+        history.setOldConfig(oldConfigMap);
+        history.setNewConfig(newConfigMap);
+        
+        RequestUser user = SmartRequestUtil.getRequestUser();
+        history.setChangedBy(user != null ? user.getUserName() : "unknown");
+        
         history.setCreateTime(LocalDateTime.now());
         connectorConfigHistoryDao.insert(history);
 
-        ConnectorRouteEntity entity = SmartBeanUtil.copy(updateForm, ConnectorRouteEntity.class);
-        // Ensure version increment or handle optimistic locking if needed
-        entity.setVersion(oldEntity.getVersion() != null ? oldEntity.getVersion() + 1 : 1);
+        // 5. Update DB
+        newEntity.setVersion(oldEntity.getVersion() != null ? oldEntity.getVersion() + 1 : 1);
+        newEntity.setUpdateTime(LocalDateTime.now());
+        connectorRouteDao.updateById(newEntity);
         
-        connectorRouteDao.updateById(entity);
         return ResponseDTO.ok();
+    }
+
+    private Map<String, Object> createConfigSnapshot(ConnectorRouteEntity entity) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("name", entity.getName());
+        map.put("channel", entity.getChannel());
+        map.put("sourcePath", entity.getSourcePath());
+        map.put("targetUrl", entity.getTargetUrl());
+        map.put("method", entity.getMethod());
+        map.put("status", entity.getStatus());
+        
+        if (entity.getMappingConfig() != null) {
+            map.put("mappingConfig", new HashMap<>(entity.getMappingConfig()));
+        } else {
+            map.put("mappingConfig", null);
+        }
+        return map;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public ResponseDTO<String> delete(String id) {
         connectorRouteDao.deleteById(id);
+        return ResponseDTO.ok();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseDTO<String> rollback(String historyId) {
+        ConnectorConfigHistoryEntity history = connectorConfigHistoryDao.selectById(historyId);
+        if (history == null) {
+            return ResponseDTO.userErrorParam("History record not found");
+        }
+
+        ConnectorRouteEntity route = connectorRouteDao.selectById(history.getRouteId());
+        if (route == null) {
+            return ResponseDTO.userErrorParam("Route not found");
+        }
+
+        // 1. Snapshot Current State (Before Rollback)
+        Map<String, Object> oldConfigMap = createConfigSnapshot(route);
+        
+        // Use OldConfig to revert the change represented by this history record
+        Map<String, Object> historyConfig = history.getOldConfig();
+        if (historyConfig == null || historyConfig.isEmpty()) {
+             return ResponseDTO.userErrorParam("Cannot rollback: Previous configuration is empty.");
+        }
+
+        // 2. Apply Rollback to Route Object
+        if (historyConfig.containsKey("mappingConfig") && historyConfig.containsKey("targetUrl")) {
+            // New format: Full snapshot
+            if (historyConfig.containsKey("name")) route.setName((String) historyConfig.get("name"));
+            if (historyConfig.containsKey("channel")) route.setChannel((String) historyConfig.get("channel"));
+            if (historyConfig.containsKey("sourcePath")) route.setSourcePath((String) historyConfig.get("sourcePath"));
+            if (historyConfig.containsKey("targetUrl")) route.setTargetUrl((String) historyConfig.get("targetUrl"));
+            if (historyConfig.containsKey("method")) route.setMethod((String) historyConfig.get("method"));
+            if (historyConfig.containsKey("status")) route.setStatus((String) historyConfig.get("status"));
+            
+            // Handle mappingConfig safely
+            if (historyConfig.containsKey("mappingConfig")) {
+                Object mappingConfigObj = historyConfig.get("mappingConfig");
+                if (mappingConfigObj instanceof Map) {
+                    route.setMappingConfig((Map<String, Object>) mappingConfigObj);
+                } else {
+                    route.setMappingConfig(null);
+                }
+            }
+        } else {
+            // Old format: Only mapping config
+            route.setMappingConfig(historyConfig);
+        }
+        
+        // 3. Snapshot New State (After Rollback)
+        Map<String, Object> newConfigMap = createConfigSnapshot(route);
+        
+        // Check if configuration actually changed
+        if (oldConfigMap.equals(newConfigMap)) {
+            return ResponseDTO.userErrorParam("Current configuration is identical to the rollback target. No changes made.");
+        }
+
+        // 4. Record New History
+        ConnectorConfigHistoryEntity newHistory = new ConnectorConfigHistoryEntity();
+        newHistory.setRouteId(route.getId());
+        newHistory.setOldConfig(oldConfigMap);
+        newHistory.setNewConfig(newConfigMap);
+        
+        RequestUser user = SmartRequestUtil.getRequestUser();
+        newHistory.setChangedBy(user != null ? user.getUserName() : "unknown");
+        
+        newHistory.setCreateTime(LocalDateTime.now());
+        connectorConfigHistoryDao.insert(newHistory);
+
+        // 5. Update DB
+        route.setVersion(route.getVersion() + 1);
+        route.setUpdateTime(LocalDateTime.now());
+        connectorRouteDao.updateById(route);
+
         return ResponseDTO.ok();
     }
 }

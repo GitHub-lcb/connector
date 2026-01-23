@@ -65,12 +65,17 @@
 
         <a-tab-pane key="mapping" tab="字段映射">
           <div style="margin-bottom: 16px;">
-            <a-button type="primary" size="small" @click="addMapping">
-              <template #icon><PlusOutlined /></template> 添加映射
-            </a-button>
-            <a-button style="margin-left: 8px" size="small" @click="clearMappings" danger>
-              清空映射
-            </a-button>
+            <a-space>
+              <a-button type="primary" size="small" @click="addMapping">
+                <template #icon><PlusOutlined /></template> 添加映射
+              </a-button>
+              <a-button type="dashed" size="small" @click="openSmartMapping" style="background-color: #f6ffed; border-color: #b7eb8f; color: #52c41a">
+                <template #icon><RobotOutlined /></template> AI 智能映射
+              </a-button>
+              <a-button size="small" @click="clearMappings" danger>
+                清空映射
+              </a-button>
+            </a-space>
           </div>
           
           <div v-for="(mapping, index) in formState.mappingConfig.mappings" :key="index" class="mapping-item">
@@ -177,15 +182,18 @@
     </template>
     
     <TransformModal ref="transformModalRef" @ok="handleTransformOk" />
+    <SmartMappingModal ref="smartMappingModalRef" @ok="handleSmartMappingOk" />
   </a-drawer>
 </template>
 
 <script setup>
 import { reactive, ref, nextTick } from 'vue';
 import { message } from 'ant-design-vue';
+import { RobotOutlined } from '@ant-design/icons-vue';
 import { connectorApi } from '/@/api/business/connector/connector-api';
 import _ from 'lodash';
 import TransformModal from './transform-modal.vue';
+import SmartMappingModal from './smart-mapping-modal.vue';
 
 const emit = defineEmits(['reloadList']);
 
@@ -195,6 +203,7 @@ const saving = ref(false);
 const activeTab = ref('basic');
 const formRef = ref();
 const transformModalRef = ref();
+const smartMappingModalRef = ref();
 
 const initialState = {
   id: undefined,
@@ -337,6 +346,45 @@ function handleTransformOk(index, rules) {
   if (index >= 0 && index < formState.mappingConfig.mappings.length) {
     formState.mappingConfig.mappings[index].transformations = rules;
   }
+}
+
+// AI Mapping Logic
+function openSmartMapping() {
+  if (smartMappingModalRef.value) {
+    smartMappingModalRef.value.show();
+  }
+}
+
+function handleSmartMappingOk(newMappings) {
+  if (!newMappings || newMappings.length === 0) return;
+  
+  // 简单的去重添加策略
+  // 如果已存在相同的 source，则更新 target；否则追加
+  newMappings.forEach(newItem => {
+    const existingIndex = formState.mappingConfig.mappings.findIndex(
+      m => m.source === newItem.source
+    );
+    
+    if (existingIndex !== -1) {
+      // 更新现有映射的目标字段和类型
+      formState.mappingConfig.mappings[existingIndex].target = newItem.target;
+      formState.mappingConfig.mappings[existingIndex].targetType = newItem.targetType || 'string';
+      if (newItem.defaultValue !== undefined) {
+        formState.mappingConfig.mappings[existingIndex].defaultValue = newItem.defaultValue;
+      }
+    } else {
+      // 追加新映射
+      formState.mappingConfig.mappings.push({
+        source: newItem.source,
+        target: newItem.target,
+        targetType: newItem.targetType || 'string',
+        defaultValue: newItem.defaultValue || null,
+        transformations: []
+      });
+    }
+  });
+  
+  message.success(`已应用 ${newMappings.length} 条智能映射规则`);
 }
 
 // Header Logic

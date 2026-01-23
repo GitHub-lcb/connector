@@ -43,7 +43,7 @@ export const appDefaultConfig = {
   // 水印
   watermarkFlag: true,
   // 网站名称
-  websiteName: 'SmartAdmin 3.X',
+  websiteName: 'Connector',
   // 主题颜色
   primaryColor: '#1677ff',
   // 紧凑

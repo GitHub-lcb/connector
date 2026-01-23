@@ -12,7 +12,7 @@
   <div class="login-container">
     <div class="box-item desc">
       <div class="welcome">
-        <p>欢迎登录 SmartAdmin V3</p>
+        <p>欢迎登录 找钢 Connector</p>
         <p class="sub-welcome">「高质量代码、简洁、高效、安全」的开发平台</p>
       </div>
       <img class="welcome-img" :src="loginGif" />
@@ -46,7 +46,7 @@
         </a-form-item>
         <a-form-item>
           <a-checkbox v-model:checked="rememberPwd">记住密码</a-checkbox>
-          <span> ( 账号：admin, 密码：123456)</span>
+          <span> ( 账号：lcb, 密码：TWZ12wh@)</span>
         </a-form-item>
         <a-form-item>
           <div class="btn" @click="onLogin">登录</div>
@@ -100,7 +100,7 @@
   //--------------------- 登录表单 ---------------------------------
 
   const loginForm = reactive({
-    loginName: 'admin',
+    loginName: 'lcb',
     password: '',
     captchaCode: '',
     captchaUuid: '',

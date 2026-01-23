@@ -2,7 +2,7 @@
   <a-modal
     v-model:open="visible"
     title="配置变更历史"
-    width="1000px"
+    width="1200px"
     :footer="null"
     @cancel="onClose"
   >
@@ -26,18 +26,18 @@
       <div class="history-detail">
         <div v-if="selectedHistory" class="diff-viewer">
           <div class="diff-header">
-            <span>旧版本</span>
-            <span>新版本</span>
+            <div class="header-title">配置对比</div>
+            <div class="header-actions">
+               <a-space>
+                  <a-radio-group v-model:value="diffMode" size="small" button-style="solid">
+                    <a-radio-button value="line-by-line">行内对比</a-radio-button>
+                    <a-radio-button value="side-by-side">左右对比</a-radio-button>
+                  </a-radio-group>
+                  <a-button type="primary" size="small" danger @click="handleRollback">回滚至此版本</a-button>
+               </a-space>
+            </div>
           </div>
-          <!-- We use a simple JSON viewer for now as diff2html might need more setup -->
-          <div class="json-compare">
-             <div class="json-box">
-               <JsonViewer :value="selectedHistory.oldConfig" copyable sort expanded :expand-depth="3"/>
-             </div>
-             <div class="json-box">
-               <JsonViewer :value="selectedHistory.newConfig" copyable sort expanded :expand-depth="3"/>
-             </div>
-          </div>
+          <div class="diff-content" v-html="diffHtml"></div>
         </div>
         <div v-else class="empty-select">
           请选择左侧历史记录查看详情
@@ -48,14 +48,40 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { connectorApi } from '/@/api/business/connector/connector-api';
-import { JsonViewer } from 'vue3-json-viewer';
-import 'vue3-json-viewer/dist/index.css';
+import { message, Modal } from 'ant-design-vue';
+import * as Diff from 'diff';
+import { html } from 'diff2html';
+import 'diff2html/bundles/css/diff2html.min.css';
 
 const visible = ref(false);
 const historyList = ref([]);
 const selectedHistory = ref(null);
+const diffMode = ref('side-by-side');
+
+const diffHtml = computed(() => {
+  if (!selectedHistory.value) return '';
+  
+  const oldConfig = selectedHistory.value.oldConfig || {};
+  const newConfig = selectedHistory.value.newConfig || {};
+  
+  const oldStr = JSON.stringify(oldConfig, null, 2);
+  const newStr = JSON.stringify(newConfig, null, 2);
+  
+  const patch = Diff.createTwoFilesPatch(
+    '旧版本',
+    '新版本',
+    oldStr,
+    newStr
+  );
+  
+  return html(patch, {
+    drawFileList: false,
+    matching: 'lines',
+    outputFormat: diffMode.value,
+  });
+});
 
 async function showModal(routeId) {
   visible.value = true;
@@ -80,6 +106,28 @@ function onClose() {
   visible.value = false;
 }
 
+function handleRollback() {
+  if (!selectedHistory.value) return;
+  
+  Modal.confirm({
+    title: '确认回滚',
+    content: '确定要回滚到此版本吗？这将覆盖当前的配置，并生成一条新的历史记录。',
+    okText: '确认回滚',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await connectorApi.rollback(selectedHistory.value.id);
+         message.success('回滚成功');
+         onClose();
+         emit('reloadList');
+       } catch (e) {
+         console.error(e);
+      }
+    }
+  });
+}
+
 defineExpose({
   showModal
 });
@@ -99,6 +147,9 @@ defineExpose({
   
   .history-item {
     cursor: pointer;
+    padding: 10px;
+    border-bottom: 1px solid #f0f0f0;
+    
     &:hover {
       background-color: #f5f5f5;
     }
@@ -111,6 +162,7 @@ defineExpose({
       flex-direction: column;
       .time {
         font-weight: bold;
+        margin-bottom: 4px;
       }
       .user {
         font-size: 12px;
@@ -141,28 +193,30 @@ defineExpose({
     
     .diff-header {
       display: flex;
-      padding: 10px;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px;
       border-bottom: 1px solid #eee;
-      span {
-        flex: 1;
-        text-align: center;
+      background: #fafafa;
+      
+      .header-title {
         font-weight: bold;
+        font-size: 16px;
       }
     }
     
-    .json-compare {
+    .diff-content {
       flex: 1;
-      display: flex;
-      overflow: hidden;
+      overflow: auto;
+      padding: 10px;
       
-      .json-box {
-        flex: 1;
-        overflow: auto;
-        padding: 10px;
-        border-right: 1px solid #eee;
-        &:last-child {
-          border-right: none;
-        }
+      :deep(.d2h-file-header) {
+        display: none;
+      }
+      
+      :deep(.d2h-file-wrapper) {
+        border: none;
+        margin-bottom: 0;
       }
     }
   }

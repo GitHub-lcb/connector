@@ -94,7 +94,7 @@
     </div>
 
     <RouteFormDrawer ref="formDrawer" @reloadList="queryData" />
-    <RouteHistoryModal ref="historyModal" />
+    <RouteHistoryModal ref="historyModal" @reloadList="queryData" />
   </a-card>
 </template>
 
