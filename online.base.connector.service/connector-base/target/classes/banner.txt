@@ -10,10 +10,4 @@
 热爱代码 热爱生活 !
 永远年轻 永远前行 !
 
-SmartAdmin v3.X ，作者：连接器 @copyright：【 1024lab 】
-
-SmartAdmin 文档地址：https://smartadmin.vip
-
-连接器：https://www.1024lab.net
-
 ${AnsiColor.DEFAULT}
