@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zhaogang.connector.admin.module.system.tenant.dao.TenantDao">
+
+    <select id="queryPage" resultType="com.zhaogang.connector.admin.module.system.tenant.domain.vo.TenantVO">
+        SELECT * FROM t_tenant
+        <where>
+            <if test="query.tenantName != null and query.tenantName != ''">
+                AND tenant_name LIKE CONCAT('%', #{query.tenantName}, '%')
+            </if>
+            <if test="query.contactPerson != null and query.contactPerson != ''">
+                AND contact_person LIKE CONCAT('%', #{query.contactPerson}, '%')
+            </if>
+            <if test="query.contactPhone != null and query.contactPhone != ''">
+                AND contact_phone LIKE CONCAT('%', #{query.contactPhone}, '%')
+            </if>
+        </where>
+        <if test="query.sortItemList == null or query.sortItemList.size() == 0">
+            ORDER BY create_time DESC
+        </if>
+    </select>
+</mapper>

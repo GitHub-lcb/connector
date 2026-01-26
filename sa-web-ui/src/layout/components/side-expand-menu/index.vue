@@ -1,0 +1,87 @@
+<!--
+  * 展开菜单
+  * 
+  * @Author:    连接器-主任：卓大 
+  * @Date:      2022-09-06 20:29:12 
+  * @Wechat:    zhuda1024 
+  * @Email:     lab1024@163.com 
+  * @Copyright  连接器 （ https://www.zhaogang.com ），Since 2012 
+-->
+<template>
+  <div class="menu-container">
+    <!-- 第一列：一级导航 -->
+    <TopMenu ref="topMenuRef" class="top-menu" />
+    <!-- 第二列：二级导航 -->
+    <RecursionMenu ref="recursionMenuRef" class="recursion-menu" />
+  </div>
+</template>
+<script setup>
+  import { onMounted, ref, watch } from 'vue';
+  import { useRoute } from 'vue-router';
+  import RecursionMenu from './recursion-menu.vue';
+  import TopMenu from './top-menu.vue';
+  import { useUserStore } from '/@/store/modules/system/user';
+  import _ from 'lodash';
+
+  const props = defineProps({
+    placeholder: {
+      type: String,
+      default: '请选择',
+    },
+  });
+
+  // 选中的顶级菜单
+  const topMenuRef = ref();
+  // 二级菜单引用
+  const recursionMenuRef = ref();
+
+  let currentRoute = useRoute();
+
+  // 根据路由更新菜单展开和选中状态
+  function updateSelectKeyAndOpenKey() {
+    // 查找 menuId
+    let currentMenuId = currentRoute.name;
+    // 如果 name 不是数字（可能是字符串路由名），尝试通过 path 查找 menuId
+    if (!_.isNumber(currentMenuId) && _.isNaN(_.toNumber(currentMenuId))) {
+      const menuRouterList = useUserStore().getMenuRouterList;
+      const foundMenu = menuRouterList.find((item) => item.path === currentRoute.path);
+      if (foundMenu) {
+        currentMenuId = foundMenu.menuId.toString();
+      }
+    }
+
+    // 第一步，根据路由 更新选中 顶级菜单
+    let parentList = useUserStore().menuParentIdListMap.get(currentMenuId.toString()) || [];
+    if (parentList.length === 0) {
+      topMenuRef.value.updateSelectKey(currentMenuId);
+      return;
+    }
+    topMenuRef.value.updateSelectKey(parentList[0].name);
+
+    //第二步，根据路由 更新 二级菜单的selectKey和openKey
+    recursionMenuRef.value.updateSelectKeyAndOpenKey(parentList, currentMenuId);
+  }
+
+  onMounted(updateSelectKeyAndOpenKey);
+
+  //监听路由的变化，进行更新菜单展开项目
+  watch(currentRoute, () => {
+    updateSelectKeyAndOpenKey();
+  });
+</script>
+<style scoped lang="less">
+  .menu-container {
+    display: flex;
+    height: 100%;
+
+    .top-menu {
+      width: 114px;
+      flex-shrink: 0;
+    }
+
+    .recursion-menu {
+      min-width: 126px;
+      flex: 1;
+    }
+  }
+</style>

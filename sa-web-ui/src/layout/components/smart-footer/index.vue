@@ -1,0 +1,32 @@
+<!--
+  * 底部：版权、公司等信息
+  *
+  * @Author:    连接器-主任：卓大
+  * @Date:      2022-09-06 20:29:12
+  * @Wechat:    zhuda1024
+  * @Email:     lab1024@163.com
+  * @Copyright  连接器 （ https://www.zhaogang.com ），Since 2012
+-->
+<template>
+  <div class="version">
+    <a target="_blank" class="smart-copyright" href="https://www.1024lab.net"> ©2012-{{ currentYear }} 找钢 | Connector </a>
+  </div>
+</template>
+<script setup>
+  import dayjs from 'dayjs';
+
+  const currentYear = dayjs().year();
+</script>
+
+<style lang="less" scoped>
+  .version {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.45);
+    a {
+      color: rgba(0, 0, 0, 0.45);
+    }
+    a:hover {
+      color: @primary-color;
+    }
+  }
+</style>
